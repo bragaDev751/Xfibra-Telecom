@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 
-// Importa os componentes desabilitando SSR para isolar o ambiente cliente
 const PlanosDinamicos = dynamic(() => import('./PlanosDinamicos'), { ssr: false })
 const Cobertura = dynamic(() => import('./Cobertura'), { ssr: false })
 
