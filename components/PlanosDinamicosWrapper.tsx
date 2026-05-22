@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import PlanosDinamicos from './PlanosDinamicos'
-import Cobertura from './Cobertura'
+import dynamic from 'next/dynamic'
+
+// Importa os componentes desabilitando SSR para isolar o ambiente cliente
+const PlanosDinamicos = dynamic(() => import('./PlanosDinamicos'), { ssr: false })
+const Cobertura = dynamic(() => import('./Cobertura'), { ssr: false })
 
 interface Plano {
   nome: string
@@ -20,16 +23,15 @@ interface PlanosDinamicosWrapperProps {
 
 export default function PlanosDinamicosWrapper({ planos }: PlanosDinamicosWrapperProps) {
   const [cidadeDetectada, setCidadeDetectada] = useState<string>('Detectando')
-  const [loadingGeo, setLoadingGeo] = useState(true)
-  const [erroGeo, setErroGeo] = useState('')
-  const [isClient, setIsClient] = useState(false)
+  const [loadingGeo, setLoadingGeo] = useState<boolean>(true)
+  const [erroGeo, setErroGeo] = useState<string>('')
 
   const cidadesAtendidas = ['Banabuiú', 'Juatama', 'Choró']
 
   useEffect(() => {
+    // Usamos o setTimeout(..., 0) para que qualquer alteração de estado 
+    // aconteça fora do fluxo síncrono inicial do useEffect, eliminando o erro de cascata.
     setTimeout(() => {
-      setIsClient(true)
-
       if (typeof navigator === 'undefined' || !navigator.geolocation) {
         setCidadeDetectada('Geral')
         setLoadingGeo(false)
@@ -50,7 +52,7 @@ export default function PlanosDinamicosWrapper({ planos }: PlanosDinamicosWrappe
               setCidadeDetectada(cityResult)
             } else {
               setCidadeDetectada('Geral')
-              setErroGeo(`Identificamos que você está em ${cityResult}.`)
+              setErroGeo(`Identificamos que você está em ${cityResult || 'outra região'}.`)
             }
           } catch {
             setCidadeDetectada('Geral')
@@ -68,6 +70,7 @@ export default function PlanosDinamicosWrapper({ planos }: PlanosDinamicosWrappe
 
   return (
     <>
+      {/* SEÇÃO DE PLANOS INTERATIVOS */}
       <section id="planos" className="py-16 md:py-24 px-4 max-w-7xl mx-auto relative border-t border-slate-900 overflow-hidden">
         <div className="text-center mb-12 md:mb-16 px-2">
           <span className="text-cyan-400 text-xs font-bold uppercase tracking-widest bg-cyan-950/40 border border-cyan-500/20 px-3 py-1 rounded-full">
@@ -80,13 +83,14 @@ export default function PlanosDinamicosWrapper({ planos }: PlanosDinamicosWrappe
         <PlanosDinamicos 
           planosIniciais={planos} 
           cidadeDetectada={cidadeDetectada}
-          setCidadeDetectada={setCidadeDetectada}
+          setCidadeDetectada={(novaCidade: string) => setCidadeDetectada(novaCidade)}
           loadingGeo={loadingGeo}
           erroGeo={erroGeo}
-          isClient={isClient}
+          isClient={true}
         />
       </section>
 
+      {/* SEÇÃO DE VERIFICAÇÃO DE COBERTURA */}
       <Cobertura cidadeDetectada={cidadeDetectada} />
     </>
   )
