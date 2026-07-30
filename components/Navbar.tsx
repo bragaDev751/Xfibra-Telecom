@@ -1,15 +1,17 @@
 "use client"
 
+import Link from "next/link"
+
 export default function Navbar() {
   return (
     <nav className="fixed top-0 left-0 w-full z-50 border-b border-slate-800/40 bg-[#0B0F19]/70 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         
         {/* LOGO XFIBRA */}
-        <div className="flex items-center gap-2 font-black text-2xl tracking-tighter bg-gradient-to-r from-white to-cyan-400 bg-clip-text text-transparent">
+        <Link href="/" className="flex items-center gap-2 font-black text-2xl tracking-tighter bg-gradient-to-r from-white to-cyan-400 bg-clip-text text-transparent">
           <span>X</span>
           <span className="text-white font-medium text-lg tracking-normal -ml-1">FIBRA</span>
-        </div>
+        </Link>
 
         {/* LINKS DE NAVEGAÇÃO */}
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-400">
@@ -28,8 +30,9 @@ export default function Navbar() {
           </a>
         </div>
 
-        {/* BOTÃO CENTRAL DO ASSINANTE */}
-        <div>
+        {/* BOTÕES DE AÇÃO */}
+        <div className="flex items-center gap-3">
+          {/* BOTÃO DA ÁREA DO CLIENTE */}
           <a 
             href="https://xfibra.atlaz.com.br/central" 
             target="_blank" 
@@ -38,6 +41,16 @@ export default function Navbar() {
           >
             Área do Cliente
           </a>
+
+          {/* BOTÃO DA ÁREA ADMIN */}
+          <Link 
+            href="/admin/login" 
+            className="px-3.5 py-2.5 bg-slate-900/80 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5"
+            title="Painel Administrativo"
+          >
+            <span>🔒</span>
+            <span className="hidden sm:inline">Admin</span>
+          </Link>
         </div>
 
       </div>
