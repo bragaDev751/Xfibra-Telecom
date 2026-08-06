@@ -6,8 +6,11 @@ import { createClient } from '@/lib/supabase'
 export interface Produto {
   id: number
   nome: string
-  preco: number
-  estoque: number
+  categoria?: string
+  preco?: number
+  valor_unitario?: number
+  estoque?: number
+  quantidade?: number
   disponivel?: boolean
 }
 
@@ -18,10 +21,22 @@ interface Props {
   onUpdate: () => void
 }
 
+const CATEGORIAS = [
+  'Todas',
+  'EPI',
+  'Equipamentos Ativos',
+  'Passivos Ópticos',
+  'Ferramentas & Instrumentos',
+  'Cabeamento & Ferragens',
+  'Geral'
+]
+
 export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate }: Props) {
   const [nome, setNome] = useState('')
+  const [categoria, setCategoria] = useState('Geral')
   const [preco, setPreco] = useState('')
   const [estoque, setEstoque] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('Todas')
   const [editandoId, setEditandoId] = useState<number | null>(null)
   const [loadingAction, setLoadingAction] = useState(false)
 
@@ -40,16 +55,18 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
         .from('produtos')
         .update({
           nome,
-          preco: precoNum,
-          estoque: estoqueNum,
+          categoria,
+          valor_unitario: precoNum,
+          quantidade: estoqueNum,
         })
         .eq('id', editandoId)
     } else {
       await supabase.from('produtos').insert([
         {
           nome,
-          preco: precoNum,
-          estoque: estoqueNum,
+          categoria,
+          valor_unitario: precoNum,
+          quantidade: estoqueNum,
           tenant_id: tenantId,
           disponivel: true,
         },
@@ -64,8 +81,9 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
   function handleEditar(p: Produto) {
     setEditandoId(p.id)
     setNome(p.nome)
-    setPreco(p.preco.toString())
-    setEstoque(p.estoque.toString())
+    setCategoria(p.categoria || 'Geral')
+    setPreco((p.valor_unitario ?? p.preco ?? 0).toString())
+    setEstoque((p.quantidade ?? p.estoque ?? 0).toString())
   }
 
   async function handleDeletar(id: number) {
@@ -74,7 +92,6 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
     onUpdate()
   }
 
-  // 🗑️ Função para Limpar Todo o Estoque
   async function handleLimparTudo() {
     const confirmacao = confirm(
       '⚠️ ATENÇÃO: Tem certeza que deseja EXCLUIR TODOS OS PRODUTOS do estoque? Esta ação não pode ser desfeita.'
@@ -83,7 +100,6 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
 
     setLoadingAction(true)
 
-    // Deleta todos os produtos pertencentes ao tenant atual
     const { error } = await supabase
       .from('produtos')
       .delete()
@@ -102,9 +118,15 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
   function limparForm() {
     setEditandoId(null)
     setNome('')
+    setCategoria('Geral')
     setPreco('')
     setEstoque('')
   }
+
+  // Filtragem dos produtos por categoria
+  const produtosFiltrados = categoriaFiltro === 'Todas'
+    ? produtos
+    : produtos.filter((p) => p.categoria === categoriaFiltro)
 
   return (
     <div className="space-y-8">
@@ -131,6 +153,23 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
                 className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:outline-none transition shadow-inner"
                 placeholder="Ex: Roteador ONU Dual Band"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 uppercase mb-1.5">
+                Categoria
+              </label>
+              <select
+                value={categoria}
+                onChange={(e) => setCategoria(e.target.value)}
+                className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition shadow-inner"
+              >
+                {CATEGORIAS.filter((c) => c !== 'Todas').map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -188,10 +227,9 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
             <div>
               <h2 className="text-base font-bold text-white">Produtos em Estoque</h2>
-              <p className="text-xs text-slate-400">{produtos.length} itens cadastrados</p>
+              <p className="text-xs text-slate-400">{produtosFiltrados.length} itens exibidos</p>
             </div>
 
-            {/* 🗑️ BOTÃO LIMPAR TUDO */}
             {produtos.length > 0 && (
               <button
                 onClick={handleLimparTudo}
@@ -204,51 +242,80 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
             )}
           </div>
 
-          {produtos.length === 0 ? (
+          {/* Filtros de Categoria */}
+          <div className="p-3 bg-slate-950/20 border-b border-slate-800/80 flex flex-wrap gap-1.5">
+            {CATEGORIAS.map((cat) => (
+              <button
+                key={cat}
+                onClick={() => setCategoriaFiltro(cat)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                  categoriaFiltro === cat
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {produtosFiltrados.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">
-              Nenhum produto cadastrado até o momento.
+              Nenhum produto encontrado nesta categoria.
             </div>
           ) : (
             <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-[460px]">
-              {produtos.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-4 flex items-center justify-between gap-4 hover:bg-slate-800/30 transition"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
-                      📦
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-white">{p.nome}</p>
-                      <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
-                        <span>
-                          Qtd: <strong className="text-slate-200">{p.estoque}</strong>
-                        </span>
-                        <span>•</span>
-                        <span>
-                          Preço: <strong className="text-emerald-400">R$ {Number(p.preco || 0).toFixed(2)}</strong>
-                        </span>
+              {produtosFiltrados.map((p) => {
+                const valor = p.valor_unitario ?? p.preco ?? 0
+                const qtd = p.quantidade ?? p.estoque ?? 0
+
+                return (
+                  <div
+                    key={p.id}
+                    className="p-4 flex items-center justify-between gap-4 hover:bg-slate-800/30 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
+                        📦
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-white">{p.nome}</p>
+                          {p.categoria && (
+                            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">
+                              {p.categoria}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-slate-400 mt-0.5">
+                          <span>
+                            Qtd: <strong className="text-slate-200">{qtd}</strong>
+                          </span>
+                          <span>•</span>
+                          <span>
+                            Preço: <strong className="text-emerald-400">R$ {Number(valor).toFixed(2)}</strong>
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleEditar(p)}
-                      className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg transition"
-                    >
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDeletar(p.id)}
-                      className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition"
-                    >
-                      Excluir
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEditar(p)}
+                        className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeletar(p.id)}
+                        className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition"
+                      >
+                        Excluir
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </div>
