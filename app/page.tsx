@@ -1,7 +1,6 @@
 import { client } from '../sanity/sanityClient'
 import Navbar from '../components/Navbar'
 import FadeIn from '../components/FadeIn'
-import Cobertura from '../components/Cobertura' 
 import Diferenciais from '../components/Diferenciais'
 import AppSection from '../components/AppSection'
 import Footer from '../components/Footer'
@@ -18,16 +17,21 @@ interface Plano {
 }
 
 async function getPlanos(): Promise<Plano[]> {
-  const query = `*[_type == "plano"] | order(preco asc) {
-    nome,
-    preco,
-    velocidade,
-    destaque,
-    beneficios,
-    videoUrl,
-    cidades
-  }`
-  return await client.fetch(query)
+  try {
+    const query = `*[_type == "plano"] | order(preco asc) {
+      nome,
+      preco,
+      velocidade,
+      destaque,
+      beneficios,
+      videoUrl,
+      cidades
+    }`
+    return await client.fetch(query)
+  } catch (error) {
+    console.error("Erro ao buscar planos do Sanity:", error)
+    return []
+  }
 }
 
 export default async function LandingPage() {
@@ -42,9 +46,11 @@ export default async function LandingPage() {
       {/* =========================================================================
           1. HERO SECTION ANIMADA
           ========================================================================= */}
-      <section className="relative min-h-[85vh] flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-12 md:py-0">
-        <div className="absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cyan-500/10 blur-[130px] rounded-full pointer-events-none" />
-        <div className="absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
+      <section className="relative min-h-[80vh] sm:min-h-[85vh] flex flex-col items-center justify-center text-center px-4 max-w-5xl mx-auto py-12 md:py-0">
+        
+        {/* Orbes de brilho otimizados (Apenas Desktop) */}
+        <div className="hidden sm:block absolute top-1/3 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-cyan-500/10 blur-[130px] rounded-full pointer-events-none" />
+        <div className="hidden sm:block absolute top-1/2 right-1/4 translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-emerald-500/5 blur-[100px] rounded-full pointer-events-none" />
         
         <FadeIn delay={0.1}>
           <span className="px-4 py-1.5 rounded-full border border-cyan-500/20 bg-cyan-950/20 text-cyan-400 text-xs font-semibold tracking-wider uppercase mb-6 inline-block">
@@ -66,7 +72,7 @@ export default async function LandingPage() {
         
         <FadeIn delay={0.7}>
           <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center items-center w-full sm:w-auto px-4 sm:px-0">
-            <a href="#planos" className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-cyan-500/20 hover:scale-102 text-sm w-full sm:w-auto text-center">
+            <a href="#planos" className="px-8 py-4 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl transition-all shadow-lg shadow-cyan-500/20 text-sm w-full sm:w-auto text-center">
               Conhecer os Planos
             </a>
             <a href="#planos" className="px-8 py-4 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-semibold rounded-xl transition-all text-sm w-full sm:w-auto text-center">
