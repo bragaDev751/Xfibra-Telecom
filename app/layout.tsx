@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -12,11 +12,21 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport: Viewport = {
+  themeColor: "#0B0F19",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export const metadata: Metadata = {
   title: "XFibra Telecom | Internet Ultraveloz e Fibra Óptica Dedicada",
   description: "Sistema Integrado de Gestão e Provedor de Internet",
   icons: {
-    icon: "/logo.png", // Aponta diretamente para public/logo.png
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
   keywords: ["internet banda larga", "fibra óptica", "provedor de internet", "XFibra"],
   authors: [{ name: "XFibra Telecom" }],
@@ -31,6 +41,11 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "XFibra",
   },
 };
 
