@@ -7,10 +7,13 @@ export default function Navbar() {
     <nav className="fixed top-0 left-0 w-full z-50 border-b border-slate-800/40 bg-[#0B0F19]/70 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
         
-        {/* LOGO XFIBRA */}
-        <Link href="/" className="flex items-center gap-2 font-black text-2xl tracking-tighter bg-gradient-to-r from-white to-cyan-400 bg-clip-text text-transparent">
-          <span>X</span>
-          <span className="text-white font-medium text-lg tracking-normal -ml-1">FIBRA</span>
+        {/* LOGO XFIBRA (Imagem oficial) */}
+        <Link href="/" className="flex items-center">
+          <img
+            src="/logo.png"
+            alt="Xfibra Telecom Logo"
+            className="h-10 sm:h-12 w-auto object-contain"
+          />
         </Link>
 
         {/* LINKS DE NAVEGAÇÃO */}

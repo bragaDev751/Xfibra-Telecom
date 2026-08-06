@@ -8,6 +8,7 @@ export interface Despesa {
   descricao: string
   valor: number
   categoria?: string
+  pago?: boolean
   created_at?: string
 }
 
@@ -29,7 +30,9 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida')
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
+  const [pago, setPago] = useState(true) // Padrão: já cadastrar como pago
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | 'mes' | 'ano' | 'tudo'>('mes')
+  const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pagos' | 'pendentes'>('todos')
   const [editandoId, setEditandoId] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -56,22 +59,29 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
     return true
   }
 
-  // Filtragem de dados pelo período
-  const pedidosFiltrados = pedidos.filter((p) => pertenceAoPeriodo(p.created_at))
-  const despesasFiltradas = despesas.filter((d) => pertenceAoPeriodo(d.created_at))
+  // Filtragem por Período e Status de Pagamento
+  const despesasFiltradas = despesas.filter((d) => {
+    const noPeriodo = pertenceAoPeriodo(d.created_at)
+    if (!noPeriodo) return false
 
-  // Cálculos de Totais
+    if (filtroStatus === 'pagos') return d.pago === true
+    if (filtroStatus === 'pendentes') return d.pago === false
+    return true
+  })
+
+  const pedidosFiltrados = pedidos.filter((p) => pertenceAoPeriodo(p.created_at))
+
+  // Cálculos de Totais (considera apenas entradas e saídas confirmadas/pagas)
   const totalEntradasVendas = pedidosFiltrados.reduce((acc, curr) => acc + Number(curr.total_pedido || 0), 0)
   
-  // Lançamentos Manuais de Entradas (armazenados via despesas/categoria 'Entrada' ou direto na tabela despesas com valor negativo/categoria)
   const totalEntradasManuais = despesasFiltradas
-    .filter((d) => d.categoria === 'Entrada')
+    .filter((d) => d.categoria === 'Entrada' && d.pago)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0)
 
   const totalEntradas = totalEntradasVendas + totalEntradasManuais
 
   const totalSaidas = despesasFiltradas
-    .filter((d) => d.categoria !== 'Entrada')
+    .filter((d) => d.categoria !== 'Entrada' && d.pago)
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0)
 
   const saldoLiquido = totalEntradas - totalSaidas
@@ -90,6 +100,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
           descricao,
           valor: valorNum,
           categoria,
+          pago,
         })
         .eq('id', editandoId)
     } else {
@@ -99,7 +110,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
           valor: valorNum,
           categoria,
           tenant_id: tenantId,
-          pago: true,
+          pago,
         },
       ])
     }
@@ -108,11 +119,22 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
     onUpdate()
   }
 
+  // Alternar Status de Pagamento Direto no Histórico
+  async function toggleStatusPagamento(id: string, statusAtual: boolean) {
+    await supabase
+      .from('despesas')
+      .update({ pago: !statusAtual })
+      .eq('id', id)
+
+    onUpdate()
+  }
+
   function handleEditar(d: Despesa) {
     setEditandoId(d.id)
     setDescricao(d.descricao)
     setValor(d.valor.toString())
     setTipoLancamento(d.categoria === 'Entrada' ? 'entrada' : 'saida')
+    setPago(d.pago ?? true)
   }
 
   async function handleDeletar(id: string) {
@@ -126,89 +148,110 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
     setDescricao('')
     setValor('')
     setTipoLancamento('saida')
+    setPago(true)
   }
 
   return (
     <div className="space-y-8">
-      {/* Controles de Filtro de Período (Dia, Mês, Ano) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
+      {/* Controles de Filtro de Período e Status */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
         <div>
           <h2 className="text-base font-bold text-white">Relatório de Caixa</h2>
-          <p className="text-xs text-slate-400">Filtre os lançamentos por período de tempo</p>
+          <p className="text-xs text-slate-400">Acompanhe seus lançamentos e status de pagamento</p>
         </div>
 
-        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80">
-          <button
-            onClick={() => setFiltroPeriodo('hoje')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroPeriodo === 'hoje'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Hoje
-          </button>
-          <button
-            onClick={() => setFiltroPeriodo('mes')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroPeriodo === 'mes'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Este Mês
-          </button>
-          <button
-            onClick={() => setFiltroPeriodo('ano')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroPeriodo === 'ano'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Este Ano
-          </button>
-          <button
-            onClick={() => setFiltroPeriodo('tudo')}
-            className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition ${
-              filtroPeriodo === 'tudo'
-                ? 'bg-blue-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            Tudo
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Filtro por Status */}
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
+            <button
+              onClick={() => setFiltroStatus('todos')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroStatus === 'todos' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Todos
+            </button>
+            <button
+              onClick={() => setFiltroStatus('pagos')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroStatus === 'pagos' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ✅ Pagos
+            </button>
+            <button
+              onClick={() => setFiltroStatus('pendentes')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroStatus === 'pendentes' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              ⏳ Pendentes
+            </button>
+          </div>
+
+          {/* Filtro por Período */}
+          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
+            <button
+              onClick={() => setFiltroPeriodo('hoje')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroPeriodo === 'hoje' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Hoje
+            </button>
+            <button
+              onClick={() => setFiltroPeriodo('mes')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroPeriodo === 'mes' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Este Mês
+            </button>
+            <button
+              onClick={() => setFiltroPeriodo('ano')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroPeriodo === 'ano' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Este Ano
+            </button>
+            <button
+              onClick={() => setFiltroPeriodo('tudo')}
+              className={`px-3 py-1.5 rounded-lg transition ${
+                filtroPeriodo === 'tudo' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Tudo
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* KPI Cards (Cards de Métricas) */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {/* Entradas */}
         <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-emerald-500/20 p-5 rounded-2xl shadow-xl">
           <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
-            Entradas ({filtroPeriodo.toUpperCase()})
+            Entradas Pagas ({filtroPeriodo.toUpperCase()})
           </p>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
             + R$ {totalEntradas.toFixed(2)}
           </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Vendas + Lançamentos Manuais</p>
+          <p className="text-[11px] text-slate-400 mt-1">Vendas + Entradas Confirmadas</p>
         </div>
 
-        {/* Saídas */}
         <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-rose-500/20 p-5 rounded-2xl shadow-xl">
           <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-1">
-            Saídas ({filtroPeriodo.toUpperCase()})
+            Saídas Pagas ({filtroPeriodo.toUpperCase()})
           </p>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">
             - R$ {totalSaidas.toFixed(2)}
           </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Custos e despesas lançadas</p>
+          <p className="text-[11px] text-slate-400 mt-1">Despesas e custos quitados</p>
         </div>
 
-        {/* Saldo Líquido */}
         <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-blue-500/20 p-5 rounded-2xl shadow-xl">
           <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
-            Saldo Líquido ({filtroPeriodo.toUpperCase()})
+            Saldo Realizado ({filtroPeriodo.toUpperCase()})
           </p>
           <h3
             className={`text-2xl sm:text-3xl font-extrabold font-mono ${
@@ -217,20 +260,19 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
           >
             R$ {saldoLiquido.toFixed(2)}
           </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Balanço do período</p>
+          <p className="text-[11px] text-slate-400 mt-1">Balanço do que foi efetivamente pago</p>
         </div>
       </div>
 
-      {/* Seção de Lançamento Manual e Histórico */}
+      {/* Formulário e Histórico */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulário de Novo Lançamento */}
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl">
+        {/* Formulário */}
+        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl h-fit">
           <h2 className="text-base font-bold text-white mb-1">
             {editandoId ? '✏️ Editar Lançamento' : '📝 Novo Lançamento'}
           </h2>
           <p className="text-xs text-slate-400 mb-4">Cadastre uma nova movimentação financeira.</p>
 
-          {/* Toggle de Tipo (Entrada x Saída) */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-4">
             <button
               type="button"
@@ -290,6 +332,20 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
               />
             </div>
 
+            {/* Checkbox Status de Pagamento */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="checkbox"
+                id="pago"
+                checked={pago}
+                onChange={(e) => setPago(e.target.checked)}
+                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0 cursor-pointer"
+              />
+              <label htmlFor="pago" className="text-xs text-slate-300 cursor-pointer select-none">
+                Já foi {tipoLancamento === 'saida' ? 'pago' : 'recebido'}?
+              </label>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
@@ -318,7 +374,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
           </form>
         </div>
 
-        {/* Tabela / Histórico de Lançamentos */}
+        {/* Tabela de Lançamentos com Botão de Pagamento */}
         <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
             <h2 className="text-base font-bold text-white">Histórico do Período</h2>
@@ -329,12 +385,14 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
           {despesasFiltradas.length === 0 ? (
             <div className="p-12 text-center text-slate-500 text-sm">
-              Nenhum lançamento registrado neste período.
+              Nenhum lançamento encontrado para os filtros selecionados.
             </div>
           ) : (
-            <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-[420px]">
+            <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-[460px]">
               {despesasFiltradas.map((d) => {
                 const isEntrada = d.categoria === 'Entrada'
+                const isPago = d.pago ?? true
+
                 return (
                   <div
                     key={d.id}
@@ -351,14 +409,25 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
                         {isEntrada ? '↗' : '↘'}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-white">{d.descricao}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-white">{d.descricao}</p>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              isPago
+                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+                            }`}
+                          >
+                            {isPago ? 'Pago' : 'Pendente'}
+                          </span>
+                        </div>
                         <span className="text-[11px] text-slate-500">
                           {d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : 'Data n/d'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-4">
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
                       <span
                         className={`text-sm font-bold font-mono ${
                           isEntrada ? 'text-emerald-400' : 'text-rose-400'
@@ -366,16 +435,30 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
                       >
                         {isEntrada ? '+' : '-'} R$ {Number(d.valor).toFixed(2)}
                       </span>
-                      <div className="flex gap-2">
+
+                      {/* Botão de Toggle de Pagamento */}
+                      <button
+                        onClick={() => toggleStatusPagamento(d.id, isPago)}
+                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition font-medium ${
+                          isPago
+                            ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                            : 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
+                        }`}
+                        title={isPago ? 'Marcar como Pendente' : 'Marcar como Pago'}
+                      >
+                        {isPago ? '↩ Desfazer' : '✓ Pagar'}
+                      </button>
+
+                      <div className="flex gap-1.5">
                         <button
                           onClick={() => handleEditar(d)}
-                          className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg transition"
+                          className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg transition"
                         >
                           Editar
                         </button>
                         <button
                           onClick={() => handleDeletar(d.id)}
-                          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-3 py-1.5 rounded-lg transition"
+                          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-2.5 py-1.5 rounded-lg transition"
                         >
                           Excluir
                         </button>

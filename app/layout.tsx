@@ -13,13 +13,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "XFibra | Internet Ultraveloz e Fibra Óptica Dedicada",
-  description: "Conecte sua casa ou empresa à ultravelocidade da XFibra. Estabilidade absoluta, suporte humanizado local e planos sem franquia de dados.",
-  keywords: ["internet banda larga", "fibra óptica", "provedor de internet", "XFibra", "internet estável"],
+  title: "XFibra Telecom | Internet Ultraveloz e Fibra Óptica Dedicada",
+  description: "Sistema Integrado de Gestão e Provedor de Internet",
+  icons: {
+    icon: "/logo.png", // Aponta diretamente para public/logo.png
+  },
+  keywords: ["internet banda larga", "fibra óptica", "provedor de internet", "XFibra"],
   authors: [{ name: "XFibra Telecom" }],
   openGraph: {
-    title: "XFibra | Internet Ultraveloz e Fibra Óptica Dedicada",
-    description: "Estabilidade absoluta, suporte rápido e planos que cabem no seu bolso. Consulte a cobertura para o seu CEP.",
+    title: "XFibra Telecom",
+    description: "Conecte sua casa ou empresa com ultravelocidade.",
     url: "https://xfibra.com.br",
     siteName: "XFibra",
     locale: "pt_BR",
@@ -28,7 +31,7 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-  }
+  },
 };
 
 export default function RootLayout({
@@ -39,7 +42,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className="scroll-smooth">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0B0F19] text-slate-100 font-sans`}
       >
         {children}
       </body>

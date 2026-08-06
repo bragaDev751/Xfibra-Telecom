@@ -77,7 +77,7 @@ export default async function LandingPage() {
       </section>
 
       {/* =========================================================================
-          2 e 3. SEÇÃO DE PLANOS E COBERTURA SINCRONIZADOS COMPARTILHANDO O ESTADO
+          2 e 3. SEÇÃO DE PLANOS E COBERTURA SINCRONIZADOS
           ========================================================================= */}
       <PlanosDinamicosWrapper planos={planos} />
 
