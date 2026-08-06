@@ -28,7 +28,7 @@ const CATEGORIAS = [
   'Passivos Ópticos',
   'Ferramentas & Instrumentos',
   'Cabeamento & Ferragens',
-  'Geral'
+  'Geral',
 ]
 
 export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate }: Props) {
@@ -124,9 +124,10 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
   }
 
   // Filtragem dos produtos por categoria
-  const produtosFiltrados = categoriaFiltro === 'Todas'
-    ? produtos
-    : produtos.filter((p) => p.categoria === categoriaFiltro)
+  const produtosFiltrados =
+    categoriaFiltro === 'Todas'
+      ? produtos
+      : produtos.filter((p) => p.categoria === categoriaFiltro)
 
   return (
     <div className="space-y-8">
@@ -137,7 +138,7 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
             {editandoId ? '✏️ Editar Produto' : '➕ Adicionar Produto'}
           </h2>
           <p className="text-xs text-slate-400 mb-5">
-            Cadastre um novo item no estoque da sua operação.
+            Cadastre um novo item no estoque com a sua categoria correspondente.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -162,10 +163,10 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
               <select
                 value={categoria}
                 onChange={(e) => setCategoria(e.target.value)}
-                className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition shadow-inner"
+                className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition shadow-inner cursor-pointer"
               >
                 {CATEGORIAS.filter((c) => c !== 'Todas').map((cat) => (
-                  <option key={cat} value={cat}>
+                  <option key={cat} value={cat} className="bg-slate-900 text-white">
                     {cat}
                   </option>
                 ))}
@@ -227,7 +228,9 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
             <div>
               <h2 className="text-base font-bold text-white">Produtos em Estoque</h2>
-              <p className="text-xs text-slate-400">{produtosFiltrados.length} itens exibidos</p>
+              <p className="text-xs text-slate-400">
+                {produtosFiltrados.length} de {produtos.length} itens cadastrados
+              </p>
             </div>
 
             {produtos.length > 0 && (
@@ -242,15 +245,15 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
             )}
           </div>
 
-          {/* Filtros de Categoria */}
-          <div className="p-3 bg-slate-950/20 border-b border-slate-800/80 flex flex-wrap gap-1.5">
+          {/* Abas / Filtro de Categorias */}
+          <div className="p-3 bg-slate-950/40 border-b border-slate-800/80 flex flex-wrap gap-1.5 overflow-x-auto">
             {CATEGORIAS.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setCategoriaFiltro(cat)}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition cursor-pointer shrink-0 ${
                   categoriaFiltro === cat
-                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30 font-semibold'
                     : 'bg-slate-800/60 text-slate-400 hover:text-slate-200 hover:bg-slate-800'
                 }`}
               >
@@ -279,10 +282,10 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
                         📦
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <p className="text-sm font-semibold text-white">{p.nome}</p>
                           {p.categoria && (
-                            <span className="text-[10px] bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full border border-slate-700">
+                            <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2.5 py-0.5 rounded-full border border-blue-500/20 font-medium">
                               {p.categoria}
                             </span>
                           )}
@@ -299,7 +302,7 @@ export default function EstoqueSection({ produtos, tenantId, userRole, onUpdate 
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={() => handleEditar(p)}
                         className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg transition"
