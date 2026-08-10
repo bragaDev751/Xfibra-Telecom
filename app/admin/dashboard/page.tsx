@@ -19,10 +19,10 @@ export default function DashboardPage() {
   const supabase = createClient()
   const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || ''
 
-  const carregarDados = useCallback(async () => {
-    setLoading(true)
+ const carregarDados = useCallback(async () => {
+    // REMOVA OU COMENTE ESTA LINHA para evitar o reload da tela inteira:
+    // setLoading(true)
 
-    // 1. Validação de Sessão
     const { data: { user } } = await supabase.auth.getUser()
     const role = user?.user_metadata?.role
 
@@ -36,7 +36,6 @@ export default function DashboardPage() {
     setUserRole(role)
     if (role === 'estoque') setAbaAtiva('estoque')
 
-    // 2. Busca de Produtos
     const { data: prodData } = await supabase
       .from('produtos')
       .select('*')
@@ -45,7 +44,6 @@ export default function DashboardPage() {
 
     if (prodData) setProdutos(prodData)
 
-    // 3. Busca Financeira (Apenas ADMIN)
     if (role === 'admin') {
       const { data: despData } = await supabase
         .from('despesas')

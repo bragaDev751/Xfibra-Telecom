@@ -26,16 +26,32 @@ interface Props {
   onUpdate: () => void
 }
 
-export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdate }: Props) {
+// Função utilitária para formatar em Real (R$)
+const formatarMoeda = (valor: number) => {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
+}
+
+export default function FinanceiroSection({ despesas: despesasProp, pedidos, tenantId, onUpdate }: Props) {
+  // Estado local para permitir atualizações instantâneas sem recarregar
+  const [despesasLocal, setDespesasLocal] = useState<Despesa[]>(despesasProp)
+  
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida')
   const [descricao, setDescricao] = useState('')
   const [valor, setValor] = useState('')
-  const [pago, setPago] = useState(true) // Padrão: já cadastrar como pago
+  const [pago, setPago] = useState(true)
   const [filtroPeriodo, setFiltroPeriodo] = useState<'hoje' | 'mes' | 'ano' | 'tudo'>('mes')
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'pagos' | 'pendentes'>('todos')
   const [editandoId, setEditandoId] = useState<string | null>(null)
 
   const supabase = createClient()
+
+  // Sincroniza props se o componente pai atualizar
+  if (despesasProp !== despesasLocal && !editandoId) {
+    setDespesasLocal(despesasProp)
+  }
 
   // Função para checar se a data pertence ao período selecionado
   const pertenceAoPeriodo = (createdAt?: string) => {
@@ -60,7 +76,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
   }
 
   // Filtragem por Período e Status de Pagamento
-  const despesasFiltradas = despesas.filter((d) => {
+  const despesasFiltradas = despesasLocal.filter((d) => {
     const noPeriodo = pertenceAoPeriodo(d.created_at)
     if (!noPeriodo) return false
 
@@ -71,7 +87,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
   const pedidosFiltrados = pedidos.filter((p) => pertenceAoPeriodo(p.created_at))
 
-  // Cálculos de Totais (considera apenas entradas e saídas confirmadas/pagas)
+  // Cálculos de Totais
   const totalEntradasVendas = pedidosFiltrados.reduce((acc, curr) => acc + Number(curr.total_pedido || 0), 0)
   
   const totalEntradasManuais = despesasFiltradas
@@ -87,23 +103,38 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
   const saldoLiquido = totalEntradas - totalSaidas
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+    e.preventDefault() // Impede a página de recarregar
     if (!descricao || !valor) return
 
     const valorNum = parseFloat(valor)
     const categoria = tipoLancamento === 'entrada' ? 'Entrada' : 'Saída'
 
     if (editandoId) {
+      // Atualização Instantânea no Estado Local
+      setDespesasLocal((prev) =>
+        prev.map((d) =>
+          d.id === editandoId ? { ...d, descricao, valor: valorNum, categoria, pago } : d
+        )
+      )
+
       await supabase
         .from('despesas')
-        .update({
-          descricao,
-          valor: valorNum,
-          categoria,
-          pago,
-        })
+        .update({ descricao, valor: valorNum, categoria, pago })
         .eq('id', editandoId)
     } else {
+      const tempId = crypto.randomUUID()
+      const novoItem: Despesa = {
+        id: tempId,
+        descricao,
+        valor: valorNum,
+        categoria,
+        pago,
+        created_at: new Date().toISOString(),
+      }
+
+      // Adição Instantânea na Interface
+      setDespesasLocal((prev) => [novoItem, ...prev])
+
       await supabase.from('despesas').insert([
         {
           descricao,
@@ -119,8 +150,12 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
     onUpdate()
   }
 
-  // Alternar Status de Pagamento Direto no Histórico
+  // Alternar Status de Pagamento Instantâneo
   async function toggleStatusPagamento(id: string, statusAtual: boolean) {
+    setDespesasLocal((prev) =>
+      prev.map((d) => (d.id === id ? { ...d, pago: !statusAtual } : d))
+    )
+
     await supabase
       .from('despesas')
       .update({ pago: !statusAtual })
@@ -139,6 +174,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
   async function handleDeletar(id: string) {
     if (!confirm('Deseja excluir este registro?')) return
+    setDespesasLocal((prev) => prev.filter((d) => d.id !== id))
     await supabase.from('despesas').delete().eq('id', id)
     onUpdate()
   }
@@ -153,7 +189,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
   return (
     <div className="space-y-8">
-      {/* Controles de Filtro de Período e Status */}
+      {/* Controles de Filtro */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
         <div>
           <h2 className="text-base font-bold text-white">Relatório de Caixa</h2>
@@ -161,7 +197,6 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* Filtro por Status */}
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
             <button
               onClick={() => setFiltroStatus('todos')}
@@ -189,7 +224,6 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
             </button>
           </div>
 
-          {/* Filtro por Período */}
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
             <button
               onClick={() => setFiltroPeriodo('hoje')}
@@ -227,14 +261,14 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* KPI Cards Formatados */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-emerald-500/20 p-5 rounded-2xl shadow-xl">
           <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
             Entradas Pagas ({filtroPeriodo.toUpperCase()})
           </p>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
-            + R$ {totalEntradas.toFixed(2)}
+            {formatarMoeda(totalEntradas)}
           </h3>
           <p className="text-[11px] text-slate-400 mt-1">Vendas + Entradas Confirmadas</p>
         </div>
@@ -244,7 +278,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
             Saídas Pagas ({filtroPeriodo.toUpperCase()})
           </p>
           <h3 className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">
-            - R$ {totalSaidas.toFixed(2)}
+            {formatarMoeda(totalSaidas)}
           </h3>
           <p className="text-[11px] text-slate-400 mt-1">Despesas e custos quitados</p>
         </div>
@@ -258,7 +292,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
               saldoLiquido >= 0 ? 'text-emerald-400' : 'text-rose-400'
             }`}
           >
-            R$ {saldoLiquido.toFixed(2)}
+            {formatarMoeda(saldoLiquido)}
           </h3>
           <p className="text-[11px] text-slate-400 mt-1">Balanço do que foi efetivamente pago</p>
         </div>
@@ -266,7 +300,6 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
       {/* Formulário e Histórico */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Formulário */}
         <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl h-fit">
           <h2 className="text-base font-bold text-white mb-1">
             {editandoId ? '✏️ Editar Lançamento' : '📝 Novo Lançamento'}
@@ -319,20 +352,22 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase mb-1.5">
-                Valor (R$)
+                Valor
               </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
-                className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white focus:outline-none transition shadow-inner"
-                placeholder="0.00"
-              />
+              <div className="relative">
+                <span className="absolute left-3.5 top-3 text-sm text-slate-500 font-bold">R$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={valor}
+                  onChange={(e) => setValor(e.target.value)}
+                  className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl py-3 pl-10 pr-3 text-sm text-white focus:outline-none transition shadow-inner font-mono"
+                  placeholder="0.00"
+                />
+              </div>
             </div>
 
-            {/* Checkbox Status de Pagamento */}
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
@@ -374,7 +409,7 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
           </form>
         </div>
 
-        {/* Tabela de Lançamentos com Botão de Pagamento */}
+        {/* Tabela de Lançamentos */}
         <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
           <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
             <h2 className="text-base font-bold text-white">Histórico do Período</h2>
@@ -433,10 +468,10 @@ export default function FinanceiroSection({ despesas, pedidos, tenantId, onUpdat
                           isEntrada ? 'text-emerald-400' : 'text-rose-400'
                         }`}
                       >
-                        {isEntrada ? '+' : '-'} R$ {Number(d.valor).toFixed(2)}
+                        {isEntrada ? '+ ' : '- '}
+                        {formatarMoeda(d.valor)}
                       </span>
 
-                      {/* Botão de Toggle de Pagamento */}
                       <button
                         onClick={() => toggleStatusPagamento(d.id, isPago)}
                         className={`text-xs px-2.5 py-1.5 rounded-lg border transition font-medium ${
