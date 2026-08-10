@@ -26,7 +26,6 @@ interface Props {
   onUpdate: () => void
 }
 
-// Função utilitária para formatar em Real (R$)
 const formatarMoeda = (valor: number) => {
   return Number(valor || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -35,7 +34,6 @@ const formatarMoeda = (valor: number) => {
 }
 
 export default function FinanceiroSection({ despesas: despesasProp, pedidos, tenantId, onUpdate }: Props) {
-  // Estado local para permitir atualizações instantâneas sem recarregar
   const [despesasLocal, setDespesasLocal] = useState<Despesa[]>(despesasProp)
   
   const [tipoLancamento, setTipoLancamento] = useState<'saida' | 'entrada'>('saida')
@@ -48,12 +46,10 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
 
   const supabase = createClient()
 
-  // Sincroniza props se o componente pai atualizar
   if (despesasProp !== despesasLocal && !editandoId) {
     setDespesasLocal(despesasProp)
   }
 
-  // Função para checar se a data pertence ao período selecionado
   const pertenceAoPeriodo = (createdAt?: string) => {
     if (!createdAt) return true
     const data = new Date(createdAt)
@@ -75,7 +71,6 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
     return true
   }
 
-  // Filtragem por Período e Status de Pagamento
   const despesasFiltradas = despesasLocal.filter((d) => {
     const noPeriodo = pertenceAoPeriodo(d.created_at)
     if (!noPeriodo) return false
@@ -87,7 +82,6 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
 
   const pedidosFiltrados = pedidos.filter((p) => pertenceAoPeriodo(p.created_at))
 
-  // Cálculos de Totais
   const totalEntradasVendas = pedidosFiltrados.reduce((acc, curr) => acc + Number(curr.total_pedido || 0), 0)
   
   const totalEntradasManuais = despesasFiltradas
@@ -103,14 +97,13 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
   const saldoLiquido = totalEntradas - totalSaidas
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault() // Impede a página de recarregar
+    e.preventDefault()
     if (!descricao || !valor) return
 
     const valorNum = parseFloat(valor)
     const categoria = tipoLancamento === 'entrada' ? 'Entrada' : 'Saída'
 
     if (editandoId) {
-      // Atualização Instantânea no Estado Local
       setDespesasLocal((prev) =>
         prev.map((d) =>
           d.id === editandoId ? { ...d, descricao, valor: valorNum, categoria, pago } : d
@@ -132,7 +125,6 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
         created_at: new Date().toISOString(),
       }
 
-      // Adição Instantânea na Interface
       setDespesasLocal((prev) => [novoItem, ...prev])
 
       await supabase.from('despesas').insert([
@@ -150,7 +142,6 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
     onUpdate()
   }
 
-  // Alternar Status de Pagamento Instantâneo
   async function toggleStatusPagamento(id: string, statusAtual: boolean) {
     setDespesasLocal((prev) =>
       prev.map((d) => (d.id === id ? { ...d, pago: !statusAtual } : d))
@@ -173,7 +164,7 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
   }
 
   async function handleDeletar(id: string) {
-    if (!confirm('Deseja excluir este registro?')) return
+    if (!confirm('Excluir lançamento?')) return
     setDespesasLocal((prev) => prev.filter((d) => d.id !== id))
     await supabase.from('despesas').delete().eq('id', id)
     onUpdate()
@@ -188,324 +179,212 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos, ten
   }
 
   return (
-    <div className="space-y-8">
-      {/* Controles de Filtro */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-slate-900/60 p-4 rounded-2xl border border-slate-800 backdrop-blur-md">
-        <div>
-          <h2 className="text-base font-bold text-white">Relatório de Caixa</h2>
-          <p className="text-xs text-slate-400">Acompanhe seus lançamentos e status de pagamento</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
-            <button
-              onClick={() => setFiltroStatus('todos')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroStatus === 'todos' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setFiltroStatus('pagos')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroStatus === 'pagos' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ✅ Pagos
-            </button>
-            <button
-              onClick={() => setFiltroStatus('pendentes')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroStatus === 'pendentes' ? 'bg-amber-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ⏳ Pendentes
-            </button>
-          </div>
-
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800/80 text-xs font-semibold">
+    <div className="flex flex-col h-[calc(100vh-80px)] max-h-[100vh] overflow-hidden gap-2">
+      
+      {/* 1. Header Fixo Compacto (Filtros + Resumo em Grid Estilo Planilha) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-2 shrink-0 space-y-2">
+        {/* Controles de Filtro */}
+        <div className="flex items-center justify-between text-xs gap-1 overflow-x-auto pb-1">
+          <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 shrink-0">
             <button
               onClick={() => setFiltroPeriodo('hoje')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroPeriodo === 'hoje' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-2 py-1 rounded ${filtroPeriodo === 'hoje' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'}`}
             >
               Hoje
             </button>
             <button
               onClick={() => setFiltroPeriodo('mes')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroPeriodo === 'mes' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-2 py-1 rounded ${filtroPeriodo === 'mes' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'}`}
             >
-              Este Mês
+              Mês
             </button>
             <button
               onClick={() => setFiltroPeriodo('ano')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroPeriodo === 'ano' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
+              className={`px-2 py-1 rounded ${filtroPeriodo === 'ano' ? 'bg-blue-600 text-white font-bold' : 'text-slate-400'}`}
             >
-              Este Ano
+              Ano
+            </button>
+          </div>
+
+          <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 shrink-0">
+            <button
+              onClick={() => setFiltroStatus('todos')}
+              className={`px-2 py-1 rounded ${filtroStatus === 'todos' ? 'bg-slate-800 text-white' : 'text-slate-400'}`}
+            >
+              Todos
             </button>
             <button
-              onClick={() => setFiltroPeriodo('tudo')}
-              className={`px-3 py-1.5 rounded-lg transition ${
-                filtroPeriodo === 'tudo' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
+              onClick={() => setFiltroStatus('pagos')}
+              className={`px-2 py-1 rounded ${filtroStatus === 'pagos' ? 'bg-emerald-600 text-white' : 'text-slate-400'}`}
             >
-              Tudo
+              Pagos
             </button>
+            <button
+              onClick={() => setFiltroStatus('pendentes')}
+              className={`px-2 py-1 rounded ${filtroStatus === 'pendentes' ? 'bg-amber-600 text-white' : 'text-slate-400'}`}
+            >
+              Pendentes
+            </button>
+          </div>
+        </div>
+
+        {/* Resumo Estilo Excel */}
+        <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1.5 rounded-lg border border-slate-800 text-center font-mono">
+          <div className="border-r border-slate-800 pr-1">
+            <p className="text-[9px] uppercase text-emerald-400 font-sans font-bold">Entradas</p>
+            <p className="text-xs sm:text-sm font-bold text-emerald-400 truncate">{formatarMoeda(totalEntradas)}</p>
+          </div>
+          <div className="border-r border-slate-800 px-1">
+            <p className="text-[9px] uppercase text-rose-400 font-sans font-bold">Saídas</p>
+            <p className="text-xs sm:text-sm font-bold text-rose-400 truncate">{formatarMoeda(totalSaidas)}</p>
+          </div>
+          <div className="pl-1">
+            <p className="text-[9px] uppercase text-blue-400 font-sans font-bold">Saldo</p>
+            <p className={`text-xs sm:text-sm font-bold truncate ${saldoLiquido >= 0 ? 'text-blue-400' : 'text-rose-400'}`}>
+              {formatarMoeda(saldoLiquido)}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* KPI Cards Formatados */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-emerald-500/20 p-5 rounded-2xl shadow-xl">
-          <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-1">
-            Entradas Pagas ({filtroPeriodo.toUpperCase()})
-          </p>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-emerald-400 font-mono">
-            {formatarMoeda(totalEntradas)}
-          </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Vendas + Entradas Confirmadas</p>
+      {/* 2. Formulário Rápido Estilo Célula Excel (Fixo) */}
+      <form onSubmit={handleSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-2 shrink-0 flex flex-wrap sm:flex-nowrap gap-1.5 items-center">
+        <button
+          type="button"
+          onClick={() => setTipoLancamento(tipoLancamento === 'saida' ? 'entrada' : 'saida')}
+          className={`px-2 py-1.5 rounded text-xs font-bold shrink-0 transition ${
+            tipoLancamento === 'saida' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'
+          }`}
+        >
+          {tipoLancamento === 'saida' ? '↘ Saída' : '↗ Entrada'}
+        </button>
+
+        <input
+          type="text"
+          required
+          value={descricao}
+          onChange={(e) => setDescricao(e.target.value)}
+          placeholder="Descrição"
+          className="flex-1 min-w-[120px] bg-slate-950 border border-slate-800 rounded px-2 py-1.5 text-xs text-white focus:outline-none"
+        />
+
+        <div className="relative w-28 shrink-0">
+          <span className="absolute left-2 top-1.5 text-xs text-slate-500 font-bold">R$</span>
+          <input
+            type="number"
+            step="0.01"
+            required
+            value={valor}
+            onChange={(e) => setValor(e.target.value)}
+            placeholder="0.00"
+            className="w-full bg-slate-950 border border-slate-800 rounded py-1.5 pl-7 pr-2 text-xs text-white font-mono focus:outline-none"
+          />
         </div>
 
-        <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-rose-500/20 p-5 rounded-2xl shadow-xl">
-          <p className="text-xs font-semibold text-rose-400 uppercase tracking-wider mb-1">
-            Saídas Pagas ({filtroPeriodo.toUpperCase()})
-          </p>
-          <h3 className="text-2xl sm:text-3xl font-extrabold text-rose-400 font-mono">
-            {formatarMoeda(totalSaidas)}
-          </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Despesas e custos quitados</p>
-        </div>
+        <label className="flex items-center gap-1 text-[11px] text-slate-300 cursor-pointer shrink-0 px-1">
+          <input
+            type="checkbox"
+            checked={pago}
+            onChange={(e) => setPago(e.target.checked)}
+            className="w-3.5 h-3.5 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0"
+          />
+          Pago
+        </label>
 
-        <div className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-blue-500/20 p-5 rounded-2xl shadow-xl">
-          <p className="text-xs font-semibold text-blue-400 uppercase tracking-wider mb-1">
-            Saldo Realizado ({filtroPeriodo.toUpperCase()})
-          </p>
-          <h3
-            className={`text-2xl sm:text-3xl font-extrabold font-mono ${
-              saldoLiquido >= 0 ? 'text-emerald-400' : 'text-rose-400'
-            }`}
-          >
-            {formatarMoeda(saldoLiquido)}
-          </h3>
-          <p className="text-[11px] text-slate-400 mt-1">Balanço do que foi efetivamente pago</p>
-        </div>
-      </div>
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-3 py-1.5 rounded transition shrink-0 ml-auto"
+        >
+          {editandoId ? 'Salvar' : '+ Add'}
+        </button>
+      </form>
 
-      {/* Formulário e Histórico */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-slate-900/50 backdrop-blur-md border border-slate-800 p-6 rounded-2xl h-fit">
-          <h2 className="text-base font-bold text-white mb-1">
-            {editandoId ? '✏️ Editar Lançamento' : '📝 Novo Lançamento'}
-          </h2>
-          <p className="text-xs text-slate-400 mb-4">Cadastre uma nova movimentação financeira.</p>
+      {/* 3. Tabela Rolo Interno (Estilo Planilha Excel) */}
+      <div className="flex-1 bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col min-h-0">
+        <div className="overflow-x-auto overflow-y-auto flex-1">
+          <table className="w-full text-left border-collapse text-xs">
+            <thead className="bg-slate-950 text-slate-400 font-mono sticky top-0 z-10 border-b border-slate-800">
+              <tr>
+                <th className="p-2 border-r border-slate-800/60 w-8 text-center">T</th>
+                <th className="p-2 border-r border-slate-800/60">Descrição</th>
+                <th className="p-2 border-r border-slate-800/60 text-right">Valor (R$)</th>
+                <th className="p-2 border-r border-slate-800/60 text-center w-16">Status</th>
+                <th className="p-2 text-center w-20">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/50 font-mono">
+              {despesasFiltradas.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="p-6 text-center text-slate-500 font-sans text-xs">
+                    Nenhum lançamento no período.
+                  </td>
+                </tr>
+              ) : (
+                despesasFiltradas.map((d) => {
+                  const isEntrada = d.categoria === 'Entrada'
+                  const isPago = d.pago ?? true
 
-          <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800 mb-4">
-            <button
-              type="button"
-              onClick={() => setTipoLancamento('saida')}
-              className={`py-2 text-xs font-bold rounded-lg transition ${
-                tipoLancamento === 'saida'
-                  ? 'bg-rose-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ↘ Saída (Gasto)
-            </button>
-            <button
-              type="button"
-              onClick={() => setTipoLancamento('entrada')}
-              className={`py-2 text-xs font-bold rounded-lg transition ${
-                tipoLancamento === 'entrada'
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              ↗ Entrada (Receita)
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase mb-1.5">
-                Descrição
-              </label>
-              <input
-                type="text"
-                required
-                value={descricao}
-                onChange={(e) => setDescricao(e.target.value)}
-                className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:outline-none transition shadow-inner"
-                placeholder={
-                  tipoLancamento === 'saida'
-                    ? 'Ex: Link Dedicado / Servidor'
-                    : 'Ex: Aporte / Serviço Avulso'
-                }
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase mb-1.5">
-                Valor
-              </label>
-              <div className="relative">
-                <span className="absolute left-3.5 top-3 text-sm text-slate-500 font-bold">R$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={valor}
-                  onChange={(e) => setValor(e.target.value)}
-                  className="w-full bg-slate-950/80 border border-slate-800 focus:border-blue-500 rounded-xl py-3 pl-10 pr-3 text-sm text-white focus:outline-none transition shadow-inner font-mono"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                type="checkbox"
-                id="pago"
-                checked={pago}
-                onChange={(e) => setPago(e.target.checked)}
-                className="w-4 h-4 rounded bg-slate-950 border-slate-800 text-blue-600 focus:ring-0 cursor-pointer"
-              />
-              <label htmlFor="pago" className="text-xs text-slate-300 cursor-pointer select-none">
-                Já foi {tipoLancamento === 'saida' ? 'pago' : 'recebido'}?
-              </label>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="submit"
-                className={`flex-1 text-white font-medium py-3 rounded-xl text-sm transition shadow-lg active:scale-[0.98] ${
-                  tipoLancamento === 'saida'
-                    ? 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 shadow-rose-600/20'
-                    : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/20'
-                }`}
-              >
-                {editandoId
-                  ? 'Salvar Alterações'
-                  : tipoLancamento === 'saida'
-                  ? 'Lançar Saída'
-                  : 'Lançar Entrada'}
-              </button>
-              {editandoId && (
-                <button
-                  type="button"
-                  onClick={limparForm}
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium px-4 rounded-xl text-sm transition"
-                >
-                  Cancelar
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-
-        {/* Tabela de Lançamentos */}
-        <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-md border border-slate-800 rounded-2xl overflow-hidden flex flex-col">
-          <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950/30">
-            <h2 className="text-base font-bold text-white">Histórico do Período</h2>
-            <span className="text-xs text-slate-400 font-medium">
-              {despesasFiltradas.length} lançamentos
-            </span>
-          </div>
-
-          {despesasFiltradas.length === 0 ? (
-            <div className="p-12 text-center text-slate-500 text-sm">
-              Nenhum lançamento encontrado para os filtros selecionados.
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-800/60 overflow-y-auto max-h-[460px]">
-              {despesasFiltradas.map((d) => {
-                const isEntrada = d.categoria === 'Entrada'
-                const isPago = d.pago ?? true
-
-                return (
-                  <div
-                    key={d.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 transition"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm shrink-0 border ${
-                          isEntrada
-                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                            : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                        }`}
-                      >
-                        {isEntrada ? '↗' : '↘'}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-semibold text-white">{d.descricao}</p>
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              isPago
-                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
-                                : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                            }`}
-                          >
-                            {isPago ? 'Pago' : 'Pendente'}
-                          </span>
-                        </div>
-                        <span className="text-[11px] text-slate-500">
-                          {d.created_at ? new Date(d.created_at).toLocaleDateString('pt-BR') : 'Data n/d'}
+                  return (
+                    <tr key={d.id} className="hover:bg-slate-800/40 transition">
+                      {/* Tipo */}
+                      <td className="p-2 border-r border-slate-800/40 text-center font-bold">
+                        <span className={isEntrada ? 'text-emerald-400' : 'text-rose-400'}>
+                          {isEntrada ? '↗' : '↘'}
                         </span>
-                      </div>
-                    </div>
+                      </td>
 
-                    <div className="flex items-center justify-between sm:justify-end gap-3">
-                      <span
-                        className={`text-sm font-bold font-mono ${
-                          isEntrada ? 'text-emerald-400' : 'text-rose-400'
-                        }`}
-                      >
-                        {isEntrada ? '+ ' : '- '}
+                      {/* Descrição */}
+                      <td className="p-2 border-r border-slate-800/40 font-sans truncate max-w-[140px] sm:max-w-none">
+                        <span className="text-slate-200 font-medium block truncate">{d.descricao}</span>
+                      </td>
+
+                      {/* Valor */}
+                      <td className={`p-2 border-r border-slate-800/40 text-right font-bold ${
+                        isEntrada ? 'text-emerald-400' : 'text-rose-400'
+                      }`}>
                         {formatarMoeda(d.valor)}
-                      </span>
+                      </td>
 
-                      <button
-                        onClick={() => toggleStatusPagamento(d.id, isPago)}
-                        className={`text-xs px-2.5 py-1.5 rounded-lg border transition font-medium ${
-                          isPago
-                            ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
-                            : 'bg-emerald-600/20 border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30'
-                        }`}
-                        title={isPago ? 'Marcar como Pendente' : 'Marcar como Pago'}
-                      >
-                        {isPago ? '↩ Desfazer' : '✓ Pagar'}
-                      </button>
+                      {/* Status */}
+                      <td className="p-2 border-r border-slate-800/40 text-center">
+                        <button
+                          onClick={() => toggleStatusPagamento(d.id, isPago)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            isPago
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                          }`}
+                        >
+                          {isPago ? 'Pago' : 'Pend.'}
+                        </button>
+                      </td>
 
-                      <div className="flex gap-1.5">
-                        <button
-                          onClick={() => handleEditar(d)}
-                          className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-2.5 py-1.5 rounded-lg transition"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDeletar(d.id)}
-                          className="text-xs bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 px-2.5 py-1.5 rounded-lg transition"
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                      {/* Ações */}
+                      <td className="p-2 text-center">
+                        <div className="flex justify-center gap-1">
+                          <button
+                            onClick={() => handleEditar(d)}
+                            className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded hover:bg-slate-700"
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            onClick={() => handleDeletar(d.id)}
+                            className="text-[10px] bg-rose-500/10 text-rose-400 px-1.5 py-0.5 rounded hover:bg-rose-500/20"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
+
     </div>
   )
 }
