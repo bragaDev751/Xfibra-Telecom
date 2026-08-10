@@ -6,6 +6,13 @@ import { createClient } from '@/lib/supabase'
 import EstoqueSection, { Produto } from './components/EstoqueSection'
 import FinanceiroSection, { Despesa, Pedido } from './components/FinanceiroSection'
 
+const formatarMoeda = (valor: number) => {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  })
+}
+
 export default function DashboardPage() {
   const [userRole, setUserRole] = useState<'admin' | 'estoque'>('estoque')
   const [abaAtiva, setAbaAtiva] = useState<'estoque' | 'financeiro'>('estoque')
@@ -19,10 +26,7 @@ export default function DashboardPage() {
   const supabase = createClient()
   const tenantId = process.env.NEXT_PUBLIC_TENANT_ID || ''
 
- const carregarDados = useCallback(async () => {
-    // REMOVA OU COMENTE ESTA LINHA para evitar o reload da tela inteira:
-    // setLoading(true)
-
+  const carregarDados = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const role = user?.user_metadata?.role
 
@@ -73,9 +77,8 @@ export default function DashboardPage() {
     router.push('/admin/login')
   }
 
-  // CÁLCULOS FINANCEIROS
+  // CÁLCULOS UNIFICADOS (CONSIDERANDO APENAS REGISTROS PAGOS)
   const totalEntradasVendas = pedidos.reduce((acc, curr) => acc + Number(curr.total_pedido || 0), 0)
-  
   const totalEntradasManuais = despesas
     .filter((d) => d.categoria === 'Entrada' && (d.pago ?? true))
     .reduce((acc, curr) => acc + Number(curr.valor || 0), 0)
@@ -90,13 +93,13 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#07090E] text-slate-100 font-sans selection:bg-blue-600 selection:text-white pb-12">
-      {/* Background Decorativo Otimizado (desativado em telas pequenas) */}
+      {/* Background Decorativo */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 hidden sm:block">
         <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[120px]" />
         <div className="absolute top-[30%] right-[-10%] w-[450px] h-[450px] bg-purple-600/10 rounded-full blur-[120px]" />
       </div>
 
-      {/* Header Fixo com Logo Otimizada */}
+      {/* Header Fixo */}
       <header className="sticky top-0 z-50 border-b border-slate-800/80 bg-[#07090E] sm:bg-[#07090E]/90 sm:backdrop-blur-md shadow-lg shadow-black/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -134,7 +137,7 @@ export default function DashboardPage() {
       {/* Conteúdo Principal */}
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
-        {/* KPI Summary Cards (Cards de Alto Desempenho) */}
+        {/* KPI Summary Cards */}
         <div className={`grid grid-cols-1 ${userRole === 'admin' ? 'sm:grid-cols-3' : 'sm:grid-cols-1'} gap-4 mb-8`}>
           <div className="bg-[#0e131f] border border-slate-800/80 p-5 rounded-2xl shadow-lg">
             <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">
@@ -150,7 +153,7 @@ export default function DashboardPage() {
                   Total Faturado
                 </p>
                 <h3 className="text-2xl font-bold text-emerald-400 font-mono">
-                  R$ {totalEntradas.toFixed(2)}
+                  {formatarMoeda(totalEntradas)}
                 </h3>
               </div>
 
@@ -161,7 +164,7 @@ export default function DashboardPage() {
                 <h3 className={`text-2xl font-bold font-mono ${
                   saldoLiquido >= 0 ? 'text-blue-400' : 'text-rose-400'
                 }`}>
-                  R$ {saldoLiquido.toFixed(2)}
+                  {formatarMoeda(saldoLiquido)}
                 </h3>
               </div>
             </>
