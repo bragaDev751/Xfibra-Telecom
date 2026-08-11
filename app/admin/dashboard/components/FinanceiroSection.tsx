@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export interface Despesa {
@@ -43,9 +43,10 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
 
   const supabase = createClient()
 
-  if (despesasProp !== despesasLocal && draggedIndex === null) {
+  // Sincroniza props com estado local apenas quando as props realmente mudarem
+  useEffect(() => {
     setDespesasLocal(despesasProp)
-  }
+  }, [despesasProp])
 
   const converterParaNumero = (valStr: string | number) => {
     if (typeof valStr === 'number') return valStr
@@ -123,9 +124,12 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
     )
   }
 
-  async function handleSalvarValorBanco(id: string, valorFinal: number) {
-    await supabase.from('despesas').update({ valor: valorFinal }).eq('id', id)
-    onUpdate()
+  async function handleSalvarValorBanco(id: string) {
+    const item = despesasLocal.find((d) => d.id === id)
+    if (item) {
+      await supabase.from('despesas').update({ valor: item.valor }).eq('id', id)
+      onUpdate()
+    }
   }
 
   // 4. Zerar Valores Mantendo a Lista
@@ -180,6 +184,7 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
         <div className="flex justify-between items-center px-1">
           <span className="text-xs font-bold text-slate-300">Resumo do Caixa</span>
           <button
+            type="button"
             onClick={handleZerarValores}
             className="bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/40 text-[11px] font-bold px-2.5 py-1 rounded-lg transition"
           >
@@ -343,10 +348,10 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
                           <span className="text-[10px] text-slate-500 mr-1 font-sans">R$</span>
                           <input
                             type="text"
-                            defaultValue={d.valor === 0 ? '' : d.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            value={d.valor === 0 ? '' : d.valor}
                             onChange={(e) => handleAlterarValorLocal(d.id, e.target.value)}
-                            onBlur={(e) => handleSalvarValorBanco(d.id, converterParaNumero(e.target.value))}
-                            placeholder="0,00"
+                            onBlur={() => handleSalvarValorBanco(d.id)}
+                            placeholder="0.00"
                             className={`w-20 bg-transparent text-right font-bold focus:outline-none ${
                               isEntrada ? 'text-emerald-400' : 'text-rose-400'
                             }`}
@@ -372,6 +377,7 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
                       {/* Botão de Excluir */}
                       <td className="p-2 text-center">
                         <button
+                          type="button"
                           onClick={() => handleDeletar(d.id)}
                           className="text-[10px] bg-rose-500/10 text-rose-400 p-1 rounded hover:bg-rose-500/20 transition"
                           title="Excluir"
