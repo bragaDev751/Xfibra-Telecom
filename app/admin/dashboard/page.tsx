@@ -53,7 +53,7 @@ export default function DashboardPage() {
         .from('despesas')
         .select('*')
         .eq('tenant_id', tenantId)
-        .order('created_at', { ascending: false })
+        .order('ordem', { ascending: true })
 
       if (despData) setDespesas(despData)
 

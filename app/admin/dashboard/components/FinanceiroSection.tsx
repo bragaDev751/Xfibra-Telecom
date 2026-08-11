@@ -10,6 +10,7 @@ export interface Despesa {
   categoria?: string
   pago?: boolean
   created_at?: string
+  ordem?: number
 }
 
 export interface Pedido {
@@ -43,7 +44,6 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
 
   const supabase = createClient()
 
-  // Sincroniza props com estado local apenas quando as props realmente mudarem
   useEffect(() => {
     setDespesasLocal(despesasProp)
   }, [despesasProp])
@@ -84,6 +84,7 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
 
     const valorNum = converterParaNumero(valorInput)
     const categoria = tipoLancamento === 'entrada' ? 'Entrada' : 'Saída'
+    const novaOrdem = despesasLocal.length
 
     const novoItem: Despesa = {
       id: crypto.randomUUID(),
@@ -91,13 +92,14 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
       valor: valorNum,
       categoria,
       pago: true,
+      ordem: novaOrdem,
       created_at: new Date().toISOString(),
     }
 
-    setDespesasLocal((prev) => [novoItem, ...prev])
+    setDespesasLocal((prev) => [...prev, novoItem])
 
     await supabase.from('despesas').insert([
-      { descricao, valor: valorNum, categoria, tenant_id: tenantId, pago: true },
+      { descricao, valor: valorNum, categoria, tenant_id: tenantId, pago: true, ordem: novaOrdem },
     ])
 
     setDescricao('')
@@ -145,7 +147,7 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
     onUpdate()
   }
 
-  // 5. Drag and Drop
+  // 5. Drag and Drop com Salvamento da Ordem no Supabase
   function handleDragStart(index: number) {
     setDraggedIndex(index)
   }
@@ -164,8 +166,26 @@ export default function FinanceiroSection({ despesas: despesasProp, pedidos = []
     setDespesasLocal(listaReordenada)
   }
 
-  function handleDragEnd() {
+  async function handleDragEnd() {
     setDraggedIndex(null)
+
+    // Atualiza o índice 'ordem' para cada elemento
+    const listaComOrdem = despesasLocal.map((item, index) => ({
+      ...item,
+      ordem: index,
+    }))
+
+    setDespesasLocal(listaComOrdem)
+
+    // Grava as novas posições no banco de dados
+    try {
+      const updates = listaComOrdem.map((item) =>
+        supabase.from('despesas').update({ ordem: item.ordem }).eq('id', item.id)
+      )
+      await Promise.all(updates)
+    } catch (error) {
+      console.error('Erro ao salvar nova ordem:', error)
+    }
   }
 
   // 6. Excluir Lançamento
